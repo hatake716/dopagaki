@@ -196,9 +196,11 @@ class PaneWebView @JvmOverloads constructor(
          * 4 秒間だけ表示する。!important のため X 自身のスクロール連動表示にも勝つ。
          * position:fixed でレイアウトの流れから外し、退避後に余白が残らないようにする
          * （表示時はタイムラインに重なる）。あわせてホーム上部のスペース（音声ルーム）
-         * カルーセルを非表示にする — スペースへのリンクを含みツイート(article)ではない
-         * タイムラインセルだけを消す。セレクタが X の DOM 変更で効かなくなっても
-         * 表示自体は壊れない。
+         * カルーセルを非表示にする。実機 DOM の検証で、スペースは #layers 内の
+         * nav > ScrollSnap-SwipeableList + placementTracking として浮いていることを
+         * 確認済み（placementTracking 条件で「おすすめ/フォロー中」タブ列 nav を
+         * 巻き添えにしない）。セレクタが X の DOM 変更で効かなくなっても表示自体は
+         * 壊れない。
          */
         private val X_BARS_JS = """
             (function() {
@@ -209,7 +211,8 @@ class PaneWebView @JvmOverloads constructor(
                 'header[role="banner"],[data-testid="TopNavBar"]{position:fixed !important;top:0 !important;left:0 !important;right:0 !important;z-index:2147483000 !important;transform:translateY(-110%) !important;transition:transform .25s ease !important;}' +
                 'html.dopagaki-top header[role="banner"],html.dopagaki-top [data-testid="TopNavBar"]{transform:none !important;}' +
                 'html.dopagaki-bottom [data-testid="BottomBar"]{transform:none !important;}' +
-                '[data-testid="cellInnerDiv"]:has(a[href*="/i/spaces"]):not(:has(article)){display:none !important;}';
+                '[data-testid="cellInnerDiv"]:has(a[href*="/i/spaces"]):not(:has(article)){display:none !important;}' +
+                '#layers nav:has([data-testid="ScrollSnap-SwipeableList"]):has([data-testid="placementTracking"]){display:none !important;}';
               var style = document.createElement('style');
               style.textContent = css;
               document.documentElement.appendChild(style);

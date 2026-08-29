@@ -129,7 +129,7 @@ dopagaki/
 ### X のバー隠蔽（下ペイン）
 
 - `onPageFinished` で X ペインに JS を注入。`<style>` で `[data-testid="BottomBar"]` を `translateY(110%)`、`header[role="banner"]` / `[data-testid="TopNavBar"]` を `translateY(-110%)` に固定（`!important` なので X 自身のスクロール連動表示にも勝つ）。あわせて `position: fixed` にしてレイアウトの流れから外す — transform だけだと退避後に元の場所が余白として残る。表示時はタイムラインに重なる
-- ホーム上部のスペース（音声ルーム）カルーセルは `[data-testid="cellInnerDiv"]:has(a[href*="/i/spaces"]):not(:has(article))` で非表示。ツイート本文（article）にスペースリンクが含まれるだけのセルは消さない
+- ホーム上部のスペース（音声ルーム）カルーセルは `#layers` のオーバーレイに `nav > [data-testid="ScrollSnap-SwipeableList"]` として浮いている（実機 DOM で確認）。`[data-testid="placementTracking"]` を含む nav だけを `display: none` にする — この条件がないと同じ構造の「おすすめ/フォロー中」タブ列 nav まで消える。補助として、スペースリンクを含みツイート（article）でないタイムラインセルも非表示
 - debug ビルドは `WebView.setWebContentsDebuggingEnabled(true)` で DevTools 検査可（X の DOM 調査用）
 - `touchstart`/`touchmove`（capture, passive）で、ペイン上端 40px 内から 24px 以上下へのスワイプ → `<html>` に `dopagaki-top` クラス、下端 40px 内から上スワイプ → `dopagaki-bottom` クラスを 4 秒間付与して transform を解除する
 - X の SPA 遷移では document が生きているので style と リスナーは維持される。X 以外のサイトではセレクタが何にも一致せず無害
