@@ -45,8 +45,12 @@
 | バックジェスチャー | システム | 最後に触ったペインで戻る。履歴がなければアプリをバックグラウンドへ |
 | タップ / スクロール | 各ペイン | そのペインが「最後に触ったペイン」になる |
 | 全画面ボタン | YouTube 内 | 上ペインの中だけで全画面（下の X はそのまま）。バックで解除 |
+| ペイン上端から下スワイプ | X ペイン内 | X の上部バーを一時表示（4 秒で自動的に隠れる） |
+| ペイン下端から上スワイプ | X ペイン内 | X の下部タブバーを一時表示（4 秒で自動的に隠れる) |
 
 YouTube は動画の再生開始時、**デフォルトで上ペイン内全画面**に切り替わる（バックまたはプレーヤーの縮小ボタンで解除）。ユーザー操作を起点としない自動再生ではブラウザの制約（transient activation）により入らないことがあり、その場合は全画面ボタンで入る。
+
+X の上部バー（ホームのヘッダー）と下部タブバーは**基本非表示**にし、タイムラインを全高で表示する。ペイン内の該当する端からのスワイプで 4 秒間だけ表示され、その間にタップ操作できる。画面最下端ぎりぎりからのスワイプはシステムの一時バー表示（イマーシブ解除）に取られることがあるので、少し内側から始める。
 
 「最後に触ったペイン」の初期値は下（X）。長押しを「離したとき」に発火させるのは、ドラッグ開始前に指を止めただけで再読み込みが走るのを防ぐため。
 
@@ -121,6 +125,12 @@ dopagaki/
 - `onHideCustomView()`: view を取り除いて WebView を VISIBLE、`callback.onCustomViewHidden()`
 - バック処理では全画面解除を最優先にする
 - 再生開始時の自動全画面: `onPageFinished` で YouTube ペインに JS を注入し、`play` イベント（capture）でプレーヤー要素（`.html5-video-player`）に `requestFullscreen()` を呼ぶ。タップ起点の再生なら transient activation が生きているので通る。サイトの全画面ボタンと同じ custom view 経路に乗るため、ペイン内に閉じ込められる
+
+### X のバー隠蔽（下ペイン）
+
+- `onPageFinished` で X ペインに JS を注入。`<style>` で `[data-testid="BottomBar"]` を `translateY(110%)`、`header[role="banner"]` / `[data-testid="TopNavBar"]` を `translateY(-110%)` に固定（`!important` なので X 自身のスクロール連動表示にも勝つ）
+- `touchstart`/`touchmove`（capture, passive）で、ペイン上端 40px 内から 24px 以上下へのスワイプ → `<html>` に `dopagaki-top` クラス、下端 40px 内から上スワイプ → `dopagaki-bottom` クラスを 4 秒間付与して transform を解除する
+- X の SPA 遷移では document が生きているので style と リスナーは維持される。X 以外のサイトではセレクタが何にも一致せず無害
 
 ### バック処理（統合コントロールの中核）
 
@@ -205,3 +215,4 @@ NixOS 側に `flake.nix`（`androidenv.composeAndroidPackages` + JDK 17）を用
 6. **YouTube の初期 URL**: m.youtube.com のトップ。登録チャンネル一覧などにしたければ変更
 7. **レイアウトは ConstraintLayout ではなく LinearLayout + weight**（v0.1 実装時の変更）: 開発環境（NixOS）の aapt2 が ConstraintLayout の res-auto 属性（`layout_constraintGuide_percent` 等）をリンクできず、Maven 版 aapt2・constraintlayout 2.1.4/2.2.1 いずれでも再現した。上ペイン weight = 比率、下ペイン weight = 1 − 比率で機能は等価。境界線ハンドルはルート FrameLayout に重ね、`translationY` でペイン境界に同期する。依存から constraintlayout を外した
 8. **再生開始時の自動全画面**（2026-08-30 追加要望）: YouTube ペインは動画の再生が始まったらデフォルトで上ペイン内全画面に入る。アプリカテゴリは `social`
+9. **X のバーは基本非表示**（2026-08-30 追加要望）: X の上部バー・下部タブバーは CSS 注入で隠し、ペイン内の対応する端からのスワイプで 4 秒間だけ表示する。X の DOM（`data-testid` 等）が変わったら注入セレクタの追従が必要（§9 の制約に準ずる）

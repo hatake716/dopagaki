@@ -106,10 +106,12 @@ class PaneWebView @JvmOverloads constructor(
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
-                // 再生開始時にデフォルトで上ペイン内全画面へ（SPEC.md §3, §10.8）。
                 // SPA 遷移ではリスナーが生き続けるので、実ページロード時だけ注入する
-                if (pane == Pane.YOUTUBE) {
-                    view.evaluateJavascript(AUTO_FULLSCREEN_JS, null)
+                when (pane) {
+                    // 再生開始時にデフォルトで上ペイン内全画面へ（SPEC.md §3, §10.8）
+                    Pane.YOUTUBE -> view.evaluateJavascript(AUTO_FULLSCREEN_JS, null)
+                    // X の上下バーを隠し、端からのスワイプで一時表示（SPEC.md §3, §10.9）
+                    Pane.X -> view.evaluateJavascript(X_BARS_JS, null)
                 }
             }
 
@@ -186,6 +188,48 @@ class PaneWebView @JvmOverloads constructor(
                   setTimeout(tryFs, 0);
                 }
               }, true);
+            })();
+        """.trimIndent()
+
+        /**
+         * X の上部バーと下部タブバーを既定で隠し、ペイン内の上端/下端からのスワイプで
+         * 4 秒間だけ表示する。!important のため X 自身のスクロール連動表示にも勝つ。
+         * セレクタが X の DOM 変更で効かなくなっても表示自体は壊れない。
+         */
+        private val X_BARS_JS = """
+            (function() {
+              if (window.__dopagakiBars) return;
+              window.__dopagakiBars = true;
+              var css =
+                '[data-testid="BottomBar"]{transform:translateY(110%) !important;transition:transform .25s ease !important;}' +
+                'header[role="banner"],[data-testid="TopNavBar"]{transform:translateY(-110%) !important;transition:transform .25s ease !important;}' +
+                'html.dopagaki-top header[role="banner"],html.dopagaki-top [data-testid="TopNavBar"]{transform:none !important;}' +
+                'html.dopagaki-bottom [data-testid="BottomBar"]{transform:none !important;}';
+              var style = document.createElement('style');
+              style.textContent = css;
+              document.documentElement.appendChild(style);
+              var timers = {};
+              var reveal = function(cls) {
+                document.documentElement.classList.add(cls);
+                clearTimeout(timers[cls]);
+                timers[cls] = setTimeout(function() {
+                  document.documentElement.classList.remove(cls);
+                }, 4000);
+              };
+              var startY = null, edge = null;
+              document.addEventListener('touchstart', function(ev) {
+                var t = ev.touches[0];
+                startY = t.clientY;
+                edge = t.clientY < 40 ? 'top'
+                     : t.clientY > window.innerHeight - 40 ? 'bottom'
+                     : null;
+              }, { capture: true, passive: true });
+              document.addEventListener('touchmove', function(ev) {
+                if (edge === null) return;
+                var dy = ev.touches[0].clientY - startY;
+                if (edge === 'top' && dy > 24) { reveal('dopagaki-top'); edge = null; }
+                else if (edge === 'bottom' && dy < -24) { reveal('dopagaki-bottom'); edge = null; }
+              }, { capture: true, passive: true });
             })();
         """.trimIndent()
 
