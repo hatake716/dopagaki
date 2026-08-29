@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="divider_line">#FF3A3A3C</color>
+    <color name="divider_pill">#FF8E8E93</color>
+    <color name="ic_launcher_background">#FF101014</color>
+</resources>
