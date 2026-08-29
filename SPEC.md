@@ -153,7 +153,7 @@ dopagaki/
 
 main への push ごとに署名済み APK を GitHub Release に添付する。Pixel のブラウザから Releases ページを開いて直接インストールできる。
 
-- `actions/checkout@v4` → `actions/setup-java@v4`（temurin 17）→ `gradle/actions/setup-gradle@v4` → `./gradlew assembleRelease` → `softprops/action-gh-release@v2`（tag: `build-${{ github.run_number }}`、files: `app-release.apk`）
+- `actions/checkout@v5` → `actions/setup-java@v5`（temurin 17）→ `gradle/actions/setup-gradle@v4` → `./gradlew assembleRelease` → `softprops/action-gh-release@v2`（tag: `build-${{ github.run_number }}`、files: `app-release.apk`）
 - `permissions: contents: write`
 - 署名: 毎回同じ鍵で署名しないと上書きインストールできない。ローカルで一度だけ keystore を作り、base64 で Secrets に登録する
   - `keytool -genkeypair -v -keystore dopagaki.jks -alias dopagaki -keyalg RSA -keysize 2048 -validity 10000`
