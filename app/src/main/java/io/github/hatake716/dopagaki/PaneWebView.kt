@@ -105,6 +105,14 @@ class PaneWebView @JvmOverloads constructor(
                 }
             }
 
+            override fun onPageFinished(view: WebView, url: String?) {
+                // 再生開始時にデフォルトで上ペイン内全画面へ（SPEC.md §3, §10.8）。
+                // SPA 遷移ではリスナーが生き続けるので、実ページロード時だけ注入する
+                if (pane == Pane.YOUTUBE) {
+                    view.evaluateJavascript(AUTO_FULLSCREEN_JS, null)
+                }
+            }
+
             override fun onRenderProcessGone(
                 view: WebView,
                 detail: RenderProcessGoneDetail,
@@ -154,6 +162,33 @@ class PaneWebView @JvmOverloads constructor(
     }
 
     companion object {
+        /**
+         * 動画の play イベントでプレーヤー要素に requestFullscreen を呼ぶ。
+         * タップ起点の再生なら transient activation 内なので通り、
+         * サイトの全画面ボタンと同じ onShowCustomView 経路（＝ペイン内全画面）に乗る。
+         * プレーヤーコンテナごと全画面にすることで YouTube の操作 UI も残る。
+         */
+        private val AUTO_FULLSCREEN_JS = """
+            (function() {
+              if (window.__dopagakiAutoFs) return;
+              window.__dopagakiAutoFs = true;
+              var tryFs = function() {
+                if (document.fullscreenElement) return;
+                var p = document.querySelector('.html5-video-player')
+                     || document.getElementById('movie_player')
+                     || document.querySelector('video');
+                if (p && p.requestFullscreen) {
+                  p.requestFullscreen().catch(function() {});
+                }
+              };
+              document.addEventListener('play', function(ev) {
+                if (ev.target && ev.target.tagName === 'VIDEO') {
+                  setTimeout(tryFs, 0);
+                }
+              }, true);
+            })();
+        """.trimIndent()
+
         /**
          * URL のホストからあるべきペインを返す。どちらでもなければ null。
          * t.co はサーバーリダイレクトなので、X ペイン内では自ペイン扱いのままロードさせ、
