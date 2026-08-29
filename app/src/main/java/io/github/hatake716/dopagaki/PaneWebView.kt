@@ -194,17 +194,22 @@ class PaneWebView @JvmOverloads constructor(
         /**
          * X の上部バーと下部タブバーを既定で隠し、ペイン内の上端/下端からのスワイプで
          * 4 秒間だけ表示する。!important のため X 自身のスクロール連動表示にも勝つ。
-         * セレクタが X の DOM 変更で効かなくなっても表示自体は壊れない。
+         * position:fixed でレイアウトの流れから外し、退避後に余白が残らないようにする
+         * （表示時はタイムラインに重なる）。あわせてホーム上部のスペース（音声ルーム）
+         * カルーセルを非表示にする — スペースへのリンクを含みツイート(article)ではない
+         * タイムラインセルだけを消す。セレクタが X の DOM 変更で効かなくなっても
+         * 表示自体は壊れない。
          */
         private val X_BARS_JS = """
             (function() {
               if (window.__dopagakiBars) return;
               window.__dopagakiBars = true;
               var css =
-                '[data-testid="BottomBar"]{transform:translateY(110%) !important;transition:transform .25s ease !important;}' +
-                'header[role="banner"],[data-testid="TopNavBar"]{transform:translateY(-110%) !important;transition:transform .25s ease !important;}' +
+                '[data-testid="BottomBar"]{position:fixed !important;bottom:0 !important;left:0 !important;right:0 !important;z-index:2147483000 !important;transform:translateY(110%) !important;transition:transform .25s ease !important;}' +
+                'header[role="banner"],[data-testid="TopNavBar"]{position:fixed !important;top:0 !important;left:0 !important;right:0 !important;z-index:2147483000 !important;transform:translateY(-110%) !important;transition:transform .25s ease !important;}' +
                 'html.dopagaki-top header[role="banner"],html.dopagaki-top [data-testid="TopNavBar"]{transform:none !important;}' +
-                'html.dopagaki-bottom [data-testid="BottomBar"]{transform:none !important;}';
+                'html.dopagaki-bottom [data-testid="BottomBar"]{transform:none !important;}' +
+                '[data-testid="cellInnerDiv"]:has(a[href*="/i/spaces"]):not(:has(article)){display:none !important;}';
               var style = document.createElement('style');
               style.textContent = css;
               document.documentElement.appendChild(style);

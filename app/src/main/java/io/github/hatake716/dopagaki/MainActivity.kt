@@ -1,6 +1,7 @@
 package io.github.hatake716.dopagaki
 
 import android.content.ActivityNotFoundException
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Bundle
 import android.view.MotionEvent
@@ -9,6 +10,7 @@ import android.view.WindowManager
 import android.webkit.CookieManager
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebView
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Toast
@@ -56,6 +58,12 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
         // ダーク固定。WebView 内の prefers-color-scheme もダークになる（SPEC.md §2）
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         super.onCreate(savedInstanceState)
+
+        // debug ビルドでは WebView を Chrome DevTools (chrome://inspect / CDP) から
+        // 検査できるようにする。X の DOM 調査用
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
 
         prefs = Prefs(this)
         topRatio = prefs.topRatio.coerceIn(Prefs.MIN_RATIO, Prefs.MAX_RATIO)

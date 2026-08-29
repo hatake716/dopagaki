@@ -128,7 +128,9 @@ dopagaki/
 
 ### X のバー隠蔽（下ペイン）
 
-- `onPageFinished` で X ペインに JS を注入。`<style>` で `[data-testid="BottomBar"]` を `translateY(110%)`、`header[role="banner"]` / `[data-testid="TopNavBar"]` を `translateY(-110%)` に固定（`!important` なので X 自身のスクロール連動表示にも勝つ）
+- `onPageFinished` で X ペインに JS を注入。`<style>` で `[data-testid="BottomBar"]` を `translateY(110%)`、`header[role="banner"]` / `[data-testid="TopNavBar"]` を `translateY(-110%)` に固定（`!important` なので X 自身のスクロール連動表示にも勝つ）。あわせて `position: fixed` にしてレイアウトの流れから外す — transform だけだと退避後に元の場所が余白として残る。表示時はタイムラインに重なる
+- ホーム上部のスペース（音声ルーム）カルーセルは `[data-testid="cellInnerDiv"]:has(a[href*="/i/spaces"]):not(:has(article))` で非表示。ツイート本文（article）にスペースリンクが含まれるだけのセルは消さない
+- debug ビルドは `WebView.setWebContentsDebuggingEnabled(true)` で DevTools 検査可（X の DOM 調査用）
 - `touchstart`/`touchmove`（capture, passive）で、ペイン上端 40px 内から 24px 以上下へのスワイプ → `<html>` に `dopagaki-top` クラス、下端 40px 内から上スワイプ → `dopagaki-bottom` クラスを 4 秒間付与して transform を解除する
 - X の SPA 遷移では document が生きているので style と リスナーは維持される。X 以外のサイトではセレクタが何にも一致せず無害
 
@@ -216,3 +218,4 @@ NixOS 側に `flake.nix`（`androidenv.composeAndroidPackages` + JDK 17）を用
 7. **レイアウトは ConstraintLayout ではなく LinearLayout + weight**（v0.1 実装時の変更）: 開発環境（NixOS）の aapt2 が ConstraintLayout の res-auto 属性（`layout_constraintGuide_percent` 等）をリンクできず、Maven 版 aapt2・constraintlayout 2.1.4/2.2.1 いずれでも再現した。上ペイン weight = 比率、下ペイン weight = 1 − 比率で機能は等価。境界線ハンドルはルート FrameLayout に重ね、`translationY` でペイン境界に同期する。依存から constraintlayout を外した
 8. **再生開始時の自動全画面**（2026-08-30 追加要望）: YouTube ペインは動画の再生が始まったらデフォルトで上ペイン内全画面に入る。アプリカテゴリは `social`
 9. **X のバーは基本非表示**（2026-08-30 追加要望）: X の上部バー・下部タブバーは CSS 注入で隠し、ペイン内の対応する端からのスワイプで 4 秒間だけ表示する。X の DOM（`data-testid` 等）が変わったら注入セレクタの追従が必要（§9 の制約に準ずる）
+10. **X 上部の余白最小化とスペース非表示**（2026-08-30 追加要望）: 隠したバーは `position: fixed` で流れから外して余白を残さない。ホーム上部のスペースカルーセルは CSS で非表示
