@@ -233,6 +233,8 @@ class PaneWebView @JvmOverloads constructor(
          * 注意（実機 DOM で検証済み）:
          * - BottomBar は transform 付きラッパーに包まれており、それが fixed の基準に
          *   なってしまうため、ラッパーの transform を無効化する
+         * - nav には元の横バー高さの max-height が掛かっており、解除しないと縦メニューが
+         *   途中で切れる。項目は 64x56・アイコンは 24x24 に固定（YouTube 側と同寸）
          * - スペースカルーセルは #layers 内の nav > ScrollSnap-SwipeableList +
          *   placementTracking（この条件で「おすすめ/フォロー中」タブ列を巻き添えにしない）
          * セレクタが X の DOM 変更で効かなくなっても表示自体は壊れない。
@@ -247,8 +249,10 @@ class PaneWebView @JvmOverloads constructor(
                 'div:has(> div > [data-testid="BottomBar"]){transform:none !important;transition:none !important;}' +
                 'html [data-testid="BottomBar"][data-testid][data-testid]{position:fixed !important;left:0 !important;right:auto !important;top:50% !important;bottom:auto !important;width:auto !important;height:auto !important;transform:translate(-110%,-50%) !important;transition:transform .25s ease !important;z-index:2147483000 !important;border-radius:0 14px 14px 0 !important;overflow:hidden !important;}' +
                 'html.dopagaki-menu [data-testid="BottomBar"][data-testid][data-testid]{transform:translate(0,-50%) !important;}' +
-                'html [data-testid="BottomBar"] nav[aria-label]{flex-direction:column !important;width:auto !important;height:auto !important;}' +
-                'html [data-testid="BottomBar"] nav[aria-label]>*{flex:0 0 auto !important;width:auto !important;padding:8px 12px !important;}' +
+                'html [data-testid="BottomBar"]>div{height:auto !important;width:auto !important;flex:0 0 auto !important;min-height:0 !important;}' +
+                'html [data-testid="BottomBar"] nav[aria-label]{flex-direction:column !important;width:auto !important;height:auto !important;max-height:none !important;min-height:0 !important;flex:0 0 auto !important;}' +
+                'html [data-testid="BottomBar"] nav[aria-label]>*{flex:0 0 auto !important;width:64px !important;height:56px !important;padding:0 !important;}' +
+                'html [data-testid="BottomBar"] nav[aria-label] svg{width:24px !important;height:24px !important;}' +
                 '[data-testid="cellInnerDiv"]:has(a[href*="/i/spaces"]):not(:has(article)){display:none !important;}' +
                 '#layers nav:has([data-testid="ScrollSnap-SwipeableList"]):has([data-testid="placementTracking"]){display:none !important;}';
               var style = document.createElement('style');

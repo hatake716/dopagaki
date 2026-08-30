@@ -132,7 +132,7 @@ dopagaki/
 ### 左端の縦メニュー（両ペイン）
 
 - 各サイトの主要ナビゲーション（X: `[data-testid="BottomBar"]` 内の nav、YouTube: `ytm-pivot-bar-renderer`）を CSS で `position: fixed; left: 0; top: 50%` + `flex-direction: column` の縦メニューに変え、`translate(-110%, -50%)` で左端の外に格納する。ペイン左端 40px 内から右へ 24px 以上のスワイプで `<html>` に `dopagaki-menu` クラスを 4 秒付与して滑り込ませる（左端中央の帯はジェスチャー除外済みなのでタッチが届く）
-- **X の注意点（実機 DOM で確認）**: BottomBar は transform 付きラッパー `div` に包まれており、transform を持つ祖先は fixed の基準（containing block）になるため、そのままでは viewport 基準の配置ができない。`div:has(> div > [data-testid="BottomBar"])` でラッパーの transform を無効化する
+- **X の注意点（実機 DOM で確認）**: BottomBar は transform 付きラッパー `div` に包まれており、transform を持つ祖先は fixed の基準（containing block）になるため、そのままでは viewport 基準の配置ができない。`div:has(> div > [data-testid="BottomBar"])` でラッパーの transform を無効化する。また nav に元の横バー高さの `max-height` が残り縦メニューが途中で切れるため `max-height: none` で解除し、コンテナ収縮でアイコン svg が幅 10px に潰れるため項目 64×56・svg 24×24 に固定して YouTube 側と同寸にする
 
 ### X のバー隠蔽（下ペイン）
 
