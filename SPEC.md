@@ -1,6 +1,6 @@
-# dopagaki 仕様書 v0.1
+# dopagaki 仕様書
 
-作成: 2026-08-30 / ステータス: ドラフト（実装前）
+作成: 2026-08-30 / ステータス: v0.2 実装済み（本書は実装に追従して更新される）
 リポジトリ: https://github.com/hatake716/dopagaki
 
 ## 1. 概要
@@ -235,7 +235,7 @@ NixOS 側に `flake.nix`（`androidenv.composeAndroidPackages` + JDK 17）を用
 - YouTube は m.youtube.com をそのまま表示するため、広告や「アプリで開く」バナーはサイトの仕様どおり出る（バナーの CSS 非表示は将来検討）
 - Google アカウントのログインは WebView 内では拒否される場合がある。UA 調整で通ることが多いが、通らなければ YouTube はログアウト状態で使う（X は ID / パスワードでログインすれば問題ない）
 - アプリを裏に回すと YouTube は止まる（サイトの仕様）。Picture-in-Picture 化は将来検討
-- Google Play 公開は本書の範囲外。公開する場合は YouTube / X の利用規約（サードパーティによる埋め込み表示）の確認が必要
+- Google Play 公開は準備中（[docs/play-release.md](docs/play-release.md) にチェックリスト）。YouTube / X の利用規約（サードパーティによる表示）由来のリスクは同文書の「審査リスク」を参照
 - 広告ブロック、アカウント切替、ペインの上下入替、横画面対応はスコープ外
 
 ## 10. 本書で決めた事項（要確認）

@@ -35,18 +35,21 @@ jobs:
             echo "KEYSTORE_BASE64 が未設定のため debug 署名でビルドします（Release への添付はスキップ）"
           fi
 
-      - name: Build release APK
+      - name: Build release APK and AAB
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease bundleRelease
 
       # debug 署名フォールバック時は公開しない。鍵がビルドごとに変わり、
-      # 上書きインストール不能な APK が配布されてしまうため（SPEC.md §7）
-      - name: Attach APK to release
+      # 上書きインストール不能な APK が配布されてしまうため（SPEC.md §7）。
+      # AAB は Google Play 提出用（docs/play-release.md）
+      - name: Attach APK and AAB to release
         if: ${{ steps.keystore.outputs.signed == 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          files: app/build/outputs/apk/release/app-release.apk
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
