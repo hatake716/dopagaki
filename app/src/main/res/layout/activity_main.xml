@@ -15,6 +15,31 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <LinearLayout
+            android:id="@+id/brandBar"
+            android:layout_width="match_parent"
+            android:layout_height="20dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="@color/black">
+
+            <ImageView
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:src="@mipmap/ic_launcher"
+                android:importantForAccessibility="no" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="@string/app_name"
+                android:textColor="@color/divider_pill"
+                android:textSize="11sp"
+                android:letterSpacing="0.08"
+                android:includeFontPadding="false" />
+        </LinearLayout>
+
         <FrameLayout
             android:id="@+id/paneTopContainer"
             android:layout_width="match_parent"

@@ -33,6 +33,7 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
 
     private lateinit var prefs: Prefs
     private lateinit var root: FrameLayout
+    private lateinit var brandBar: LinearLayout
     private lateinit var paneTopContainer: FrameLayout
     private lateinit var paneBottomContainer: FrameLayout
     private lateinit var webYoutube: PaneWebView
@@ -71,6 +72,7 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
 
         setContentView(R.layout.activity_main)
         root = findViewById(R.id.root)
+        brandBar = findViewById(R.id.brandBar)
         paneTopContainer = findViewById(R.id.paneTopContainer)
         paneBottomContainer = findViewById(R.id.paneBottomContainer)
         webYoutube = findViewById(R.id.webYoutube)
@@ -234,8 +236,9 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
     override fun onDragTo(rawY: Float) {
         val location = IntArray(2)
         root.getLocationOnScreen(location)
-        val contentTop = location[1] + root.paddingTop
-        val contentHeight = root.height - root.paddingTop - root.paddingBottom
+        // ブランドバーの分を除いた領域（= weight が配分される範囲）で比率を計算する
+        val contentTop = location[1] + root.paddingTop + brandBar.height
+        val contentHeight = root.height - root.paddingTop - root.paddingBottom - brandBar.height
         if (contentHeight <= 0) return
         topRatio = ((rawY - contentTop) / contentHeight)
             .coerceIn(Prefs.MIN_RATIO, Prefs.MAX_RATIO)
