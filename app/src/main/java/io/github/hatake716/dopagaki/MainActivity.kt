@@ -212,6 +212,12 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
         AppCompatDelegate.setDefaultNightMode(
             if (darkMode) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO,
         )
+        // サイトが prefers-color-scheme に追従する猶予を与えてから、
+        // それでも希望と食い違うペインを invert フィルタで強制反転する（SPEC.md §10.17）
+        root.postDelayed({
+            webYoutube.applySiteTheme(darkMode)
+            webX.applySiteTheme(darkMode)
+        }, 600)
     }
 
     /**
@@ -263,6 +269,8 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
             Pane.X -> prefs.xUrl = url
         }
     }
+
+    override fun wantsDarkTheme(): Boolean = darkMode
 
     override fun onRenderProcessGone(pane: Pane) {
         // 両ペインが同じレンダラを共有していると 2 回呼ばれるため 1 回だけ処理する。

@@ -35,6 +35,9 @@ class PaneWebView @JvmOverloads constructor(
         /** メインフレームの URL が変わった（SPA の pushState 含む）。永続化に使う */
         fun onUrlChanged(pane: Pane, url: String)
 
+        /** アプリの現在のテーマがダークか（サイトテーマの強制反転の判定に使う） */
+        fun wantsDarkTheme(): Boolean
+
         /** レンダラプロセスが死んだ。この WebView は再利用できないので作り直しが必要 */
         fun onRenderProcessGone(pane: Pane)
 
@@ -162,7 +165,7 @@ class PaneWebView @JvmOverloads constructor(
         }
     }
 
-    /** サイト UI 調整の JS を注入する。スクリプト側の document 同一性ガードで冪等 */
+    /** サイト UI 調整の JS を注入する。スクリプト側の style 生存ガードで冪等 */
     private fun injectSiteUi(view: WebView) {
         when (pane) {
             // 自動全画面 + ピボットバー縦メニュー + 引っ張って更新（SPEC.md §10.8, §10.11, §10.14）
@@ -170,6 +173,17 @@ class PaneWebView @JvmOverloads constructor(
             // バー非表示 + メインメニュー縦メニュー + ピル非表示（SPEC.md §10.9-§10.12, §10.15）
             Pane.X -> view.evaluateJavascript(X_BARS_JS, null)
         }
+        applySiteTheme(listener.wantsDarkTheme())
+    }
+
+    /**
+     * サイトの実際の描画テーマ（背景輝度で判定）が希望と食い違うとき、ページ全体を
+     * invert フィルタで強制反転する（SPEC.md §10.17）。画像・動画は二重反転で自然な色を保つ。
+     * サイトが prefers-color-scheme に追従した場合は何もしない
+     */
+    fun applySiteTheme(dark: Boolean) {
+        evaluateJavascript(THEME_JS, null)
+        evaluateJavascript("window.__dopagakiApplyTheme && window.__dopagakiApplyTheme($dark);", null)
     }
 
     /** 全画面カスタムビューを取り除いて元の WebView 表示に戻す */
@@ -183,6 +197,47 @@ class PaneWebView @JvmOverloads constructor(
     }
 
     companion object {
+        /**
+         * テーマの強制反転（両ペイン共通）。__dopagakiApplyTheme(wantDark) を定義する。
+         * body の背景輝度からサイトの描画テーマを推定し、希望と食い違うときだけ
+         * html 全体を invert(1) hue-rotate(180deg) で反転する。ルート要素の filter は
+         * ビューポート全体に適用される特例で、fixed 配置を壊さない。
+         * 画像・動画・自前 UI は同じフィルタを重ねて元の色に戻す。
+         * Trusted Types 対応のため innerHTML は使わない
+         */
+        private val THEME_JS = """
+            (function() {
+              if (window.__dopagakiApplyTheme) return;
+              window.__dopagakiApplyTheme = function(wantDark) {
+                var bgEl = document.body || document.documentElement;
+                var c = getComputedStyle(bgEl).backgroundColor || '';
+                var m = c.match(/rgba?\((\d+)[, ]+(\d+)[, ]+(\d+)(?:[, ]+([\d.]+))?\)/);
+                var siteDark = false;
+                if (m) {
+                  var a = m[4] === undefined ? 1 : parseFloat(m[4]);
+                  if (a >= 0.1) {
+                    var lum = (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255;
+                    siteDark = lum < 0.5;
+                  }
+                }
+                var needInvert = !!wantDark !== siteDark;
+                var el = document.getElementById('dopagaki-invert');
+                if (needInvert && !el) {
+                  el = document.createElement('style');
+                  el.id = 'dopagaki-invert';
+                  el.textContent =
+                    'html{filter:invert(1) hue-rotate(180deg);}' +
+                    'img,video,picture,canvas,iframe,embed,object,' +
+                    '[style*="background-image"],#dopagaki-ptr' +
+                    '{filter:invert(1) hue-rotate(180deg);}';
+                  document.documentElement.appendChild(el);
+                } else if (!needInvert && el) {
+                  el.remove();
+                }
+              };
+            })();
+        """.trimIndent()
+
         /**
          * YouTube ペイン用:
          * 1) 動画の play イベントでプレーヤー要素に requestFullscreen を呼ぶ。
