@@ -178,6 +178,9 @@ class PaneWebView @JvmOverloads constructor(
          *    ボタンと同じ onShowCustomView 経路（＝ペイン内全画面）に乗る。
          * 2) ピボットバー（ホーム/ショート等）を画面左端の縦メニューに変え、既定で隠す。
          *    ペイン下端からの上スワイプで 4 秒表示（実機 DOM で検証済み）。
+         * 3) ホーム / フィードでは X 同様に「下に引っ張って更新」できるようにする。
+         *    ページ先頭（スクロール済みの祖先がない）で 110px 以上ほぼ垂直に引くと
+         *    リロード。/watch やショートでは無効。インジケーターは引っ張り量に追従する。
          */
         private val YOUTUBE_UI_JS = """
             (function() {
@@ -186,10 +189,18 @@ class PaneWebView @JvmOverloads constructor(
               var css =
                 'ytm-pivot-bar-renderer{position:fixed !important;left:0 !important;right:auto !important;top:50% !important;bottom:auto !important;width:auto !important;height:auto !important;flex-direction:column !important;transform:translate(-110%,-50%) !important;transition:transform .25s ease !important;z-index:2147483000 !important;border-radius:0 14px 14px 0 !important;overflow:hidden !important;}' +
                 'html.dopagaki-menu ytm-pivot-bar-renderer{transform:translate(0,-50%) !important;}' +
-                'ytm-pivot-bar-item-renderer{flex:0 0 auto !important;width:64px !important;height:56px !important;}';
+                'ytm-pivot-bar-item-renderer{flex:0 0 auto !important;width:64px !important;height:56px !important;}' +
+                '#dopagaki-ptr{position:fixed;top:6px;left:50%;margin-left:-19px;width:38px;height:38px;border-radius:50%;background:#17171d;border:1px solid #2c2c34;z-index:2147483001;display:flex;align-items:center;justify-content:center;transform:translateY(-60px);pointer-events:none;}' +
+                '#dopagaki-ptr svg{width:18px;height:18px;}' +
+                '#dopagaki-ptr.spin svg{animation:dopagaki-rot .7s linear infinite;}' +
+                '@keyframes dopagaki-rot{to{transform:rotate(360deg)}}';
               var style = document.createElement('style');
               style.textContent = css;
               document.documentElement.appendChild(style);
+              var ptr = document.createElement('div');
+              ptr.id = 'dopagaki-ptr';
+              ptr.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#FF0033" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12,4 v13 M6,11 l6,6 6,-6"/></svg>';
+              document.documentElement.appendChild(ptr);
               var tryFs = function() {
                 if (document.fullscreenElement) return;
                 var p = document.querySelector('.html5-video-player')
@@ -200,6 +211,8 @@ class PaneWebView @JvmOverloads constructor(
                 }
               };
               document.addEventListener('play', function(ev) {
+                // 視聴ページのみ。ホームのミュート自動プレビューまで全画面化しない
+                if (location.pathname !== '/watch') return;
                 if (ev.target && ev.target.tagName === 'VIDEO') {
                   setTimeout(tryFs, 0);
                 }
@@ -222,6 +235,55 @@ class PaneWebView @JvmOverloads constructor(
                 if (!edge) return;
                 if (ev.touches[0].clientX - startX > 24) { reveal(); edge = false; }
               }, { capture: true, passive: true });
+              // ---- 下に引っ張って更新（ホーム / フィードのみ） ----
+              var PULL = 110;
+              var pullEligible = function(target) {
+                var p = location.pathname;
+                if (p !== '/' && p.indexOf('/feed') !== 0) return false;
+                var el = target;
+                while (el && el !== document.documentElement) {
+                  if (el.scrollTop > 0) return false;
+                  el = el.parentElement;
+                }
+                return (document.scrollingElement || document.documentElement).scrollTop <= 0;
+              };
+              var ptrStartX = 0, ptrStartY = 0, ptrArmed = false, ptrFired = false;
+              var ptrReset = function() {
+                ptrArmed = false;
+                if (!ptrFired) {
+                  ptr.style.transition = 'transform .2s ease';
+                  ptr.style.transform = 'translateY(-60px)';
+                }
+              };
+              document.addEventListener('touchstart', function(ev) {
+                if (ptrFired) return;
+                if (ev.touches.length !== 1) { ptrArmed = false; return; }
+                var t = ev.touches[0];
+                ptrArmed = pullEligible(ev.target);
+                ptrStartX = t.clientX;
+                ptrStartY = t.clientY;
+              }, { capture: true, passive: true });
+              document.addEventListener('touchmove', function(ev) {
+                if (!ptrArmed || ptrFired || ev.touches.length !== 1) return;
+                var t = ev.touches[0];
+                var dx = t.clientX - ptrStartX, dy = t.clientY - ptrStartY;
+                // 動き出し数 px の横ぶれで捨てないよう、方向確定は少し動いてから
+                if (Math.abs(dx) < 10 && dy < 10) return;
+                if (dy < 0 || Math.abs(dx) > 48 || Math.abs(dx) > dy) { ptrReset(); return; }
+                ptr.style.transition = 'none';
+                var pull = Math.min(dy, 160);
+                ptr.style.transform = 'translateY(' + (pull * 0.55 - 60) + 'px) rotate(' + (pull * 1.6) + 'deg)';
+                if (dy > PULL) {
+                  ptrFired = true;
+                  ptrArmed = false;
+                  ptr.classList.add('spin');
+                  ptr.style.transition = 'transform .15s ease';
+                  ptr.style.transform = 'translateY(8px)';
+                  setTimeout(function() { location.reload(); }, 180);
+                }
+              }, { capture: true, passive: true });
+              document.addEventListener('touchend', ptrReset, { capture: true, passive: true });
+              document.addEventListener('touchcancel', ptrReset, { capture: true, passive: true });
             })();
         """.trimIndent()
 
@@ -237,6 +299,8 @@ class PaneWebView @JvmOverloads constructor(
          *   途中で切れる。項目は 64x56・アイコンは 24x24 に固定（YouTube 側と同寸）
          * - スペースカルーセルは #layers 内の nav > ScrollSnap-SwipeableList +
          *   placementTracking（この条件で「おすすめ/フォロー中」タブ列を巻き添えにしない）
+         * - 新着通知ピル「〜さんがポストしました / 新しいポストを表示」は
+         *   [data-testid="pillLabel"]（実機 DOM で確認）。閲覧の邪魔なので常に隠す
          * セレクタが X の DOM 変更で効かなくなっても表示自体は壊れない。
          */
         private val X_BARS_JS = """
@@ -254,7 +318,9 @@ class PaneWebView @JvmOverloads constructor(
                 'html [data-testid="BottomBar"] nav[aria-label]>*{flex:0 0 auto !important;width:64px !important;height:56px !important;padding:0 !important;}' +
                 'html [data-testid="BottomBar"] nav[aria-label] svg{width:24px !important;height:24px !important;}' +
                 '[data-testid="cellInnerDiv"]:has(a[href*="/i/spaces"]):not(:has(article)){display:none !important;}' +
-                '#layers nav:has([data-testid="ScrollSnap-SwipeableList"]):has([data-testid="placementTracking"]){display:none !important;}';
+                '#layers nav:has([data-testid="ScrollSnap-SwipeableList"]):has([data-testid="placementTracking"]){display:none !important;}' +
+                '[data-testid="pillLabel"]{display:none !important;}' +
+                'div[role="status"]:has([data-testid="pillLabel"]){display:none !important;}';
               var style = document.createElement('style');
               style.textContent = css;
               document.documentElement.appendChild(style);

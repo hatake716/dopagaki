@@ -49,6 +49,7 @@
 | 全画面ボタン | YouTube 内 | 上ペインの中だけで全画面（下の X はそのまま）。バックで解除 |
 | ペイン上端から下スワイプ | X ペイン内 | X の上部バーを一時表示（4 秒で自動的に隠れる） |
 | ペイン左端から右スワイプ | 各ペイン内 | そのペインの操作メニューを**画面左端に縦表示**（4 秒で自動的に隠れる） |
+| 先頭で下に引っ張る | YouTube のホーム / フィード | タイムラインを再読み込み（X はサイト自身の機能で更新可） |
 
 YouTube は動画の再生開始時、**デフォルトで上ペイン内全画面**に切り替わる（バックまたはプレーヤーの縮小ボタンで解除）。ユーザー操作を起点としない自動再生ではブラウザの制約（transient activation）により入らないことがあり、その場合は全画面ボタンで入る。
 
@@ -129,7 +130,7 @@ dopagaki/
 - `onHideCustomView()`: view を取り除いて WebView を VISIBLE、`callback.onCustomViewHidden()`
 - バック処理では全画面解除を最優先にする
 - **全画面中のリロード・遷移対策**: 全画面のままページを読み込み直すと `onHideCustomView` が呼ばれずカスタムビューが取り残されて真っ暗になる。`onPageStarted` と長押しリロードで必ず `exitFullscreen()` する
-- 再生開始時の自動全画面: `onPageFinished` で YouTube ペインに JS を注入し、`play` イベント（capture）でプレーヤー要素（`.html5-video-player`）に `requestFullscreen()` を呼ぶ。タップ起点の再生なら transient activation が生きているので通る。サイトの全画面ボタンと同じ custom view 経路に乗るため、ペイン内に閉じ込められる
+- 再生開始時の自動全画面: `onPageFinished` で YouTube ペインに JS を注入し、`play` イベント（capture）でプレーヤー要素（`.html5-video-player`）に `requestFullscreen()` を呼ぶ。対象は `/watch` のみ（ホームのミュート自動プレビューは全画面化しない）。タップ起点の再生なら transient activation が生きているので通る。サイトの全画面ボタンと同じ custom view 経路に乗るため、ペイン内に閉じ込められる
 
 ### 左端の縦メニュー（両ペイン）
 
@@ -140,7 +141,14 @@ dopagaki/
 
 - `onPageFinished` で X ペインに JS を注入。`<style>` で `[data-testid="BottomBar"]` を `translateY(110%)`、`header[role="banner"]` / `[data-testid="TopNavBar"]` を `translateY(-110%)` に固定（`!important` なので X 自身のスクロール連動表示にも勝つ）。あわせて `position: fixed` にしてレイアウトの流れから外す — transform だけだと退避後に元の場所が余白として残る。表示時はタイムラインに重なる
 - ホーム上部のスペース（音声ルーム）カルーセルは `#layers` のオーバーレイに `nav > [data-testid="ScrollSnap-SwipeableList"]` として浮いている（実機 DOM で確認）。`[data-testid="placementTracking"]` を含む nav だけを `display: none` にする — この条件がないと同じ構造の「おすすめ/フォロー中」タブ列 nav まで消える。補助として、スペースリンクを含みツイート（article）でないタイムラインセルも非表示
+- 新着通知ピル（「〜さんがポストしました / 新しいポストを表示」、`[data-testid="pillLabel"]`）は画面中央上に浮いて閲覧の邪魔になるため常に非表示（実機 DOM で確認）
 - debug ビルドは `WebView.setWebContentsDebuggingEnabled(true)` で DevTools 検査可（X の DOM 調査用）
+
+### YouTube の引っ張って更新（上ペイン）
+
+- m.youtube.com は自前の pull-to-refresh を持たないため JS 注入で実装。ホーム（`/`）とフィード（`/feed*`）のみ有効。`/watch` やショートでは無効
+- 発火条件: ページ先頭（`scrollingElement.scrollTop <= 0` かつタッチ対象の祖先にスクロール済み要素がない）から、ほぼ垂直（|dx| < 48px かつ |dx| < dy）に 110px 以上引く → `location.reload()`
+- 引っ張り量に追従する矢印インジケーター（`#dopagaki-ptr`）を表示し、発火後はスピナーに切り替える。m.youtube.com はドキュメントスクロール・内部スクローラーなしを実機で確認済み
 - `touchstart`/`touchmove`（capture, passive）で、ペイン上端 40px 内から 24px 以上下へのスワイプ → `<html>` に `dopagaki-top` クラス、下端 40px 内から上スワイプ → `dopagaki-bottom` クラスを 4 秒間付与して transform を解除する
 - X の SPA 遷移では document が生きているので style と リスナーは維持される。X 以外のサイトではセレクタが何にも一致せず無害
 
@@ -232,3 +240,5 @@ NixOS 側に `flake.nix`（`androidenv.composeAndroidPackages` + JDK 17）を用
 11. **操作メニューは画面左端に縦表示**（2026-08-30 追加要望）: X のメインメニューと YouTube のピボットバーを左端の縦メニューに変え、基本非表示にした（X の旧・下部タブバー表示を置き換え）。あわせて、全画面中のリロードで上ペインが真っ暗になる不具合を `onPageStarted` での全画面解除で修正
 12. **メニューの表示トリガーは左端スワイプ**（2026-08-30 追加要望）: 当初のペイン下端上スワイプを廃止し、ペイン左端からの右スワイプに変更。バックジェスチャーとの競合は、各ペイン左端中央 100dp だけをジェスチャー除外にして両立させる
 13. **最上部にブランドバー**（2026-08-30 追加要望）: 画面最上部（YouTube ペインの上）に高さ 20dp のバーを置き、アプリアイコンと「dopagaki」を中央表示する。ペイン外のネイティブ UI なので動画のペイン内全画面中も残る。比率のドラッグ計算はバー分を除いた領域で行う
+14. **YouTube に引っ張って更新**（2026-08-30 追加要望）: ホーム / フィードの先頭で下に引っ張るとタイムラインを再読み込みする（§6 参照）
+15. **X の新着通知ピルを非表示**（2026-08-30 追加要望）: 「〜さんがポストしました」のピルが画面中央上に浮いて閲覧の邪魔になるため常に隠す
