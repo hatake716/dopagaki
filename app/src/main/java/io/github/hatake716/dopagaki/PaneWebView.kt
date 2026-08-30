@@ -2,6 +2,7 @@ package io.github.hatake716.dopagaki
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.util.AttributeSet
 import android.view.View
@@ -105,12 +106,18 @@ class PaneWebView @JvmOverloads constructor(
                 }
             }
 
+            override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                // 全画面（カスタムビュー）表示中にリロード・遷移すると onHideCustomView が
+                // 呼ばれずビューが取り残されて真っ暗になるため、読み込み開始時に必ず解除する
+                exitFullscreen()
+            }
+
             override fun onPageFinished(view: WebView, url: String?) {
                 // SPA 遷移ではリスナーが生き続けるので、実ページロード時だけ注入する
                 when (pane) {
-                    // 再生開始時にデフォルトで上ペイン内全画面へ（SPEC.md §3, §10.8）
-                    Pane.YOUTUBE -> view.evaluateJavascript(AUTO_FULLSCREEN_JS, null)
-                    // X の上下バーを隠し、端からのスワイプで一時表示（SPEC.md §3, §10.9）
+                    // 自動全画面 + ピボットバーの左端縦メニュー化（SPEC.md §3, §10.8, §10.11）
+                    Pane.YOUTUBE -> view.evaluateJavascript(YOUTUBE_UI_JS, null)
+                    // バー非表示 + メインメニューの左端縦メニュー化（SPEC.md §3, §10.9-§10.11)
                     Pane.X -> view.evaluateJavascript(X_BARS_JS, null)
                 }
             }
@@ -165,15 +172,24 @@ class PaneWebView @JvmOverloads constructor(
 
     companion object {
         /**
-         * 動画の play イベントでプレーヤー要素に requestFullscreen を呼ぶ。
-         * タップ起点の再生なら transient activation 内なので通り、
-         * サイトの全画面ボタンと同じ onShowCustomView 経路（＝ペイン内全画面）に乗る。
-         * プレーヤーコンテナごと全画面にすることで YouTube の操作 UI も残る。
+         * YouTube ペイン用:
+         * 1) 動画の play イベントでプレーヤー要素に requestFullscreen を呼ぶ。
+         *    タップ起点の再生なら transient activation 内なので通り、サイトの全画面
+         *    ボタンと同じ onShowCustomView 経路（＝ペイン内全画面）に乗る。
+         * 2) ピボットバー（ホーム/ショート等）を画面左端の縦メニューに変え、既定で隠す。
+         *    ペイン下端からの上スワイプで 4 秒表示（実機 DOM で検証済み）。
          */
-        private val AUTO_FULLSCREEN_JS = """
+        private val YOUTUBE_UI_JS = """
             (function() {
-              if (window.__dopagakiAutoFs) return;
-              window.__dopagakiAutoFs = true;
+              if (window.__dopagakiYt) return;
+              window.__dopagakiYt = true;
+              var css =
+                'ytm-pivot-bar-renderer{position:fixed !important;left:0 !important;right:auto !important;top:50% !important;bottom:auto !important;width:auto !important;height:auto !important;flex-direction:column !important;transform:translate(-110%,-50%) !important;transition:transform .25s ease !important;z-index:2147483000 !important;border-radius:0 14px 14px 0 !important;overflow:hidden !important;}' +
+                'html.dopagaki-menu ytm-pivot-bar-renderer{transform:translate(0,-50%) !important;}' +
+                'ytm-pivot-bar-item-renderer{flex:0 0 auto !important;width:64px !important;height:56px !important;}';
+              var style = document.createElement('style');
+              style.textContent = css;
+              document.documentElement.appendChild(style);
               var tryFs = function() {
                 if (document.fullscreenElement) return;
                 var p = document.querySelector('.html5-video-player')
@@ -188,29 +204,51 @@ class PaneWebView @JvmOverloads constructor(
                   setTimeout(tryFs, 0);
                 }
               }, true);
+              var menuTimer = null;
+              var reveal = function() {
+                document.documentElement.classList.add('dopagaki-menu');
+                clearTimeout(menuTimer);
+                menuTimer = setTimeout(function() {
+                  document.documentElement.classList.remove('dopagaki-menu');
+                }, 4000);
+              };
+              var startY = null, edge = false;
+              document.addEventListener('touchstart', function(ev) {
+                var t = ev.touches[0];
+                startY = t.clientY;
+                edge = t.clientY > window.innerHeight - 40;
+              }, { capture: true, passive: true });
+              document.addEventListener('touchmove', function(ev) {
+                if (!edge) return;
+                if (ev.touches[0].clientY - startY < -24) { reveal(); edge = false; }
+              }, { capture: true, passive: true });
             })();
         """.trimIndent()
 
         /**
-         * X の上部バーと下部タブバーを既定で隠し、ペイン内の上端/下端からのスワイプで
-         * 4 秒間だけ表示する。!important のため X 自身のスクロール連動表示にも勝つ。
-         * position:fixed でレイアウトの流れから外し、退避後に余白が残らないようにする
-         * （表示時はタイムラインに重なる）。あわせてホーム上部のスペース（音声ルーム）
-         * カルーセルを非表示にする。実機 DOM の検証で、スペースは #layers 内の
-         * nav > ScrollSnap-SwipeableList + placementTracking として浮いていることを
-         * 確認済み（placementTracking 条件で「おすすめ/フォロー中」タブ列 nav を
-         * 巻き添えにしない）。セレクタが X の DOM 変更で効かなくなっても表示自体は
-         * 壊れない。
+         * X ペイン用。上部バーは既定で隠しペイン上端からの下スワイプで 4 秒表示。
+         * メインメニュー（旧下部タブバー）は画面左端の縦メニューに変えて既定で隠し、
+         * ペイン下端からの上スワイプで 4 秒表示する。!important のため X 自身の
+         * スクロール連動表示にも勝ち、position:fixed で流れから外すので余白も残らない。
+         * 注意（実機 DOM で検証済み）:
+         * - BottomBar は transform 付きラッパーに包まれており、それが fixed の基準に
+         *   なってしまうため、ラッパーの transform を無効化する
+         * - スペースカルーセルは #layers 内の nav > ScrollSnap-SwipeableList +
+         *   placementTracking（この条件で「おすすめ/フォロー中」タブ列を巻き添えにしない）
+         * セレクタが X の DOM 変更で効かなくなっても表示自体は壊れない。
          */
         private val X_BARS_JS = """
             (function() {
               if (window.__dopagakiBars) return;
               window.__dopagakiBars = true;
               var css =
-                '[data-testid="BottomBar"]{position:fixed !important;bottom:0 !important;left:0 !important;right:0 !important;z-index:2147483000 !important;transform:translateY(110%) !important;transition:transform .25s ease !important;}' +
                 'header[role="banner"],[data-testid="TopNavBar"]{position:fixed !important;top:0 !important;left:0 !important;right:0 !important;z-index:2147483000 !important;transform:translateY(-110%) !important;transition:transform .25s ease !important;}' +
                 'html.dopagaki-top header[role="banner"],html.dopagaki-top [data-testid="TopNavBar"]{transform:none !important;}' +
-                'html.dopagaki-bottom [data-testid="BottomBar"]{transform:none !important;}' +
+                'div:has(> div > [data-testid="BottomBar"]){transform:none !important;transition:none !important;}' +
+                'html [data-testid="BottomBar"][data-testid][data-testid]{position:fixed !important;left:0 !important;right:auto !important;top:50% !important;bottom:auto !important;width:auto !important;height:auto !important;transform:translate(-110%,-50%) !important;transition:transform .25s ease !important;z-index:2147483000 !important;border-radius:0 14px 14px 0 !important;overflow:hidden !important;}' +
+                'html.dopagaki-menu [data-testid="BottomBar"][data-testid][data-testid]{transform:translate(0,-50%) !important;}' +
+                'html [data-testid="BottomBar"] nav[aria-label]{flex-direction:column !important;width:auto !important;height:auto !important;}' +
+                'html [data-testid="BottomBar"] nav[aria-label]>*{flex:0 0 auto !important;width:auto !important;padding:8px 12px !important;}' +
                 '[data-testid="cellInnerDiv"]:has(a[href*="/i/spaces"]):not(:has(article)){display:none !important;}' +
                 '#layers nav:has([data-testid="ScrollSnap-SwipeableList"]):has([data-testid="placementTracking"]){display:none !important;}';
               var style = document.createElement('style');
@@ -236,7 +274,7 @@ class PaneWebView @JvmOverloads constructor(
                 if (edge === null) return;
                 var dy = ev.touches[0].clientY - startY;
                 if (edge === 'top' && dy > 24) { reveal('dopagaki-top'); edge = null; }
-                else if (edge === 'bottom' && dy < -24) { reveal('dopagaki-bottom'); edge = null; }
+                else if (edge === 'bottom' && dy < -24) { reveal('dopagaki-menu'); edge = null; }
               }, { capture: true, passive: true });
             })();
         """.trimIndent()

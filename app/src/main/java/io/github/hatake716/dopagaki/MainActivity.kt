@@ -229,6 +229,8 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
     }
 
     override fun onLongPressReload() {
+        // 全画面のままリロードするとカスタムビューが取り残されるため先に解除する
+        paneView(lastTouched).exitFullscreen()
         paneView(lastTouched).reload()
         val message = if (lastTouched == Pane.YOUTUBE) R.string.reload_youtube else R.string.reload_x
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
