@@ -57,7 +57,9 @@ dopagaki は、動画とタイムラインを 1 画面で同時に楽しむた�
 |---|---|
 | カテゴリ | ソーシャル |
 | メールアドレス | acesmash@gmail.com（Play Console 登録メールに合わせて変更可） |
-| プライバシーポリシー URL | https://hatake716.github.io/dopagaki/privacy-policy （Pages 有効化後。暫定: https://github.com/hatake716/dopagaki/blob/main/docs/privacy-policy.md） |
+| プライバシーポリシー URL | https://hatake716.github.io/dopagaki/privacy-policy |
+| CSAE（児童の性的虐待と搾取）に対する基準の URL | https://hatake716.github.io/dopagaki/csae-standards （Console の「アプリのコンテンツ」→「子どもの安全に関する基準」の申告で使用） |
+| 児童の安全に関する窓口（point of contact） | acesmash@gmail.com |
 | タグ | ブラウザ / SNS / 動画 |
 
 ## データセーフティの回答案

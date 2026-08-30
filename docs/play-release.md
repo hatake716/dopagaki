@@ -10,7 +10,8 @@ dopagaki を Google Play で公開するための準備状況と残作業。2026
 | App Bundle (.aab) のビルド | ✅ `./gradlew bundleRelease`。CI でも署名設定時に生成・Release 添付 |
 | 権限が INTERNET のみ | ✅ データセーフティ・審査上もっともシンプルな構成 |
 | アプリカテゴリ social 宣言 | ✅ Manifest の `appCategory` |
-| プライバシーポリシー | ✅ [docs/privacy-policy.md](privacy-policy.md)（日英）。GitHub Pages で公開して URL を使う |
+| プライバシーポリシー | ✅ [docs/privacy-policy.md](privacy-policy.md)（日英）。公開 URL: https://hatake716.github.io/dopagaki/privacy-policy |
+| CSAE（児童の安全）基準の公開リンク | ✅ [docs/csae-standards.md](csae-standards.md)（日英）。公開 URL: https://hatake716.github.io/dopagaki/csae-standards — ソーシャルカテゴリのアプリは Console の「子どもの安全に関する基準」申告でこの URL と連絡先の提出が必須 |
 | ストア掲載文の下書き | ✅ [docs/play/listing.md](play/listing.md)（名称 / 短い説明 / 詳しい説明 / データセーフティ回答案） |
 | アイコン 512×512 / フィーチャーグラフィック 1024×500 | ✅ [docs/play/](play/) |
 | サードパーティ SDK なし | ✅ 収集データゼロで申告できる |
@@ -27,7 +28,7 @@ dopagaki を Google Play で公開するための準備状況と残作業。2026
    - CI の Secrets（`KEYSTORE_BASE64` など 4 つ）が未登録ならここで登録
 3. **Console でアプリを作成**し、[listing.md](play/listing.md) の内容を貼り付け
    - 実機スクリーンショットを最低 2 枚撮影してアップロード（モックアップ不可。ログイン情報や個人のタイムラインが写り込まない画面で）
-4. **データセーフティ・コンテンツレーティング・対象年齢**の質問票に回答（回答案は listing.md）
+4. **データセーフティ・コンテンツレーティング・対象年齢・子どもの安全に関する基準**の質問票に回答（回答案・URL は listing.md）
 5. **内部テスト → クローズドテスト**
    - ⚠️ 2023-11 以降に作成された**個人**デベロッパーアカウントは、製品版公開の前に「クローズドテストでテスター 12 人以上・14 日間継続」が必須
    - AAB は CI の Release からダウンロードするか `./gradlew bundleRelease` で生成（`app/build/outputs/bundle/release/app-release.aab`）
