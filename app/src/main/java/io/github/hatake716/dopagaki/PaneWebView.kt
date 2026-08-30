@@ -104,6 +104,8 @@ class PaneWebView @JvmOverloads constructor(
                 if (url != null && (url.startsWith("https://") || url.startsWith("http://"))) {
                     listener.onUrlChanged(pane, url)
                 }
+                // SPA 遷移でも注入を打ち直す（スクリプト側の document 同一性ガードで冪等）
+                injectSiteUi(view)
             }
 
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
@@ -113,13 +115,12 @@ class PaneWebView @JvmOverloads constructor(
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
-                // SPA 遷移ではリスナーが生き続けるので、実ページロード時だけ注入する
-                when (pane) {
-                    // 自動全画面 + ピボットバーの左端縦メニュー化（SPEC.md §3, §10.8, §10.11）
-                    Pane.YOUTUBE -> view.evaluateJavascript(YOUTUBE_UI_JS, null)
-                    // バー非表示 + メインメニューの左端縦メニュー化（SPEC.md §3, §10.9-§10.11)
-                    Pane.X -> view.evaluateJavascript(X_BARS_JS, null)
-                }
+                // m.youtube.com は初回ロード後に document.open() で文書を書き換えることがあり、
+                // その時点で注入済みのリスナー・要素・style は全て消える（window のフラグだけ
+                // 残る）。document 同一性ガードで冪等にし、遅延再注入で書き換え後も復元する
+                injectSiteUi(view)
+                view.postDelayed({ injectSiteUi(view) }, 1200)
+                view.postDelayed({ injectSiteUi(view) }, 3500)
             }
 
             override fun onRenderProcessGone(
@@ -160,6 +161,16 @@ class PaneWebView @JvmOverloads constructor(
         }
     }
 
+    /** サイト UI 調整の JS を注入する。スクリプト側の document 同一性ガードで冪等 */
+    private fun injectSiteUi(view: WebView) {
+        when (pane) {
+            // 自動全画面 + ピボットバー縦メニュー + 引っ張って更新（SPEC.md §10.8, §10.11, §10.14）
+            Pane.YOUTUBE -> view.evaluateJavascript(YOUTUBE_UI_JS, null)
+            // バー非表示 + メインメニュー縦メニュー + ピル非表示（SPEC.md §10.9-§10.12, §10.15）
+            Pane.X -> view.evaluateJavascript(X_BARS_JS, null)
+        }
+    }
+
     /** 全画面カスタムビューを取り除いて元の WebView 表示に戻す */
     fun exitFullscreen() {
         val view = customView ?: return
@@ -184,13 +195,15 @@ class PaneWebView @JvmOverloads constructor(
          */
         private val YOUTUBE_UI_JS = """
             (function() {
-              if (window.__dopagakiYt) return;
-              window.__dopagakiYt = true;
+              // document.open() による書き換え後は document が別物になるので、
+              // window ではなく document の同一性で再実行を判定する
+              if (window.__dopagakiYtDoc === document) return;
+              window.__dopagakiYtDoc = document;
               var css =
                 'ytm-pivot-bar-renderer{position:fixed !important;left:0 !important;right:auto !important;top:50% !important;bottom:auto !important;width:auto !important;height:auto !important;flex-direction:column !important;transform:translate(-110%,-50%) !important;transition:transform .25s ease !important;z-index:2147483000 !important;border-radius:0 14px 14px 0 !important;overflow:hidden !important;}' +
                 'html.dopagaki-menu ytm-pivot-bar-renderer{transform:translate(0,-50%) !important;}' +
                 'ytm-pivot-bar-item-renderer{flex:0 0 auto !important;width:64px !important;height:56px !important;}' +
-                '#dopagaki-ptr{position:fixed;top:6px;left:50%;margin-left:-19px;width:38px;height:38px;border-radius:50%;background:#17171d;border:1px solid #2c2c34;z-index:2147483001;display:flex;align-items:center;justify-content:center;transform:translateY(-60px);pointer-events:none;}' +
+                '#dopagaki-ptr{position:fixed;top:6px;left:50%;margin-left:-19px;width:38px;height:38px;border-radius:50%;background:#17171d;border:1px solid #2c2c34;z-index:2147483001;display:flex;align-items:center;justify-content:center;transform:translateY(-52px);pointer-events:none;}' +
                 '#dopagaki-ptr svg{width:18px;height:18px;}' +
                 '#dopagaki-ptr.spin svg{animation:dopagaki-rot .7s linear infinite;}' +
                 '@keyframes dopagaki-rot{to{transform:rotate(360deg)}}';
@@ -252,7 +265,7 @@ class PaneWebView @JvmOverloads constructor(
                 ptrArmed = false;
                 if (!ptrFired) {
                   ptr.style.transition = 'transform .2s ease';
-                  ptr.style.transform = 'translateY(-60px)';
+                  ptr.style.transform = 'translateY(-52px)';
                 }
               };
               document.addEventListener('touchstart', function(ev) {
@@ -271,8 +284,8 @@ class PaneWebView @JvmOverloads constructor(
                 if (Math.abs(dx) < 10 && dy < 10) return;
                 if (dy < 0 || Math.abs(dx) > 48 || Math.abs(dx) > dy) { ptrReset(); return; }
                 ptr.style.transition = 'none';
-                var pull = Math.min(dy, 160);
-                ptr.style.transform = 'translateY(' + (pull * 0.55 - 60) + 'px) rotate(' + (pull * 1.6) + 'deg)';
+                var pull = Math.min(dy, 140);
+                ptr.style.transform = 'translateY(' + (pull * 0.9 - 52) + 'px) rotate(' + (pull * 1.6) + 'deg)';
                 if (dy > PULL) {
                   ptrFired = true;
                   ptrArmed = false;
@@ -305,8 +318,8 @@ class PaneWebView @JvmOverloads constructor(
          */
         private val X_BARS_JS = """
             (function() {
-              if (window.__dopagakiBars) return;
-              window.__dopagakiBars = true;
+              if (window.__dopagakiXDoc === document) return;
+              window.__dopagakiXDoc = document;
               var css =
                 'header[role="banner"],[data-testid="TopNavBar"]{position:fixed !important;top:0 !important;left:0 !important;right:0 !important;z-index:2147483000 !important;transform:translateY(-110%) !important;transition:transform .25s ease !important;}' +
                 'html.dopagaki-top header[role="banner"],html.dopagaki-top [data-testid="TopNavBar"]{transform:none !important;}' +

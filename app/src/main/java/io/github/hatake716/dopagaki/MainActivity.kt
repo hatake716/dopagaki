@@ -1,5 +1,7 @@
 package io.github.hatake716.dopagaki
 
+import android.animation.ArgbEvaluator
+import android.animation.ValueAnimator
 import android.content.ActivityNotFoundException
 import android.content.pm.ApplicationInfo
 import android.graphics.Rect
@@ -13,7 +15,9 @@ import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,6 +38,8 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
     private lateinit var prefs: Prefs
     private lateinit var root: FrameLayout
     private lateinit var brandBar: LinearLayout
+    private lateinit var brandIcon: ImageView
+    private lateinit var brandText: TextView
     private lateinit var paneTopContainer: FrameLayout
     private lateinit var paneBottomContainer: FrameLayout
     private lateinit var webYoutube: PaneWebView
@@ -56,9 +62,15 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
             fileChooserCallback = null
         }
 
+    private var darkMode = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        // ダーク固定。WebView 内の prefers-color-scheme もダークになる（SPEC.md §2）
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        // 既定はダーク。ブランドバーのタップで切り替え可能（SPEC.md §10.16）。
+        // WebView 内の prefers-color-scheme もこれに追従する
+        darkMode = Prefs(this).darkMode
+        AppCompatDelegate.setDefaultNightMode(
+            if (darkMode) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO,
+        )
         super.onCreate(savedInstanceState)
 
         // debug ビルドでは WebView を Chrome DevTools (chrome://inspect / CDP) から
@@ -73,6 +85,8 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
         setContentView(R.layout.activity_main)
         root = findViewById(R.id.root)
         brandBar = findViewById(R.id.brandBar)
+        brandIcon = findViewById(R.id.brandIcon)
+        brandText = findViewById(R.id.brandText)
         paneTopContainer = findViewById(R.id.paneTopContainer)
         paneBottomContainer = findViewById(R.id.paneBottomContainer)
         webYoutube = findViewById(R.id.webYoutube)
@@ -85,6 +99,9 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
 
         applyRatio(topRatio)
         divider.listener = this
+        applyThemeColors(if (darkMode) DARK_PALETTE else LIGHT_PALETTE)
+        brandBar.contentDescription = getString(R.string.toggle_theme)
+        brandBar.setOnClickListener { toggleTheme() }
         // 境界線ハンドルを常にペインの境界に重ねる。divider は paneTopContainer より後に
         // レイアウトされるため、初回は divider 側のリスナーで height 確定後に同期される
         paneTopContainer.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
@@ -151,6 +168,50 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
 
     private fun syncDividerPosition() {
         divider.translationY = paneTopContainer.bottom - divider.height / 2f
+    }
+
+    /** アプリ側クローム（背景・ブランドバー・境界線）の配色を一括適用する */
+    private fun applyThemeColors(p: Palette) {
+        root.setBackgroundColor(p.background)
+        brandBar.setBackgroundColor(p.background)
+        paneTopContainer.setBackgroundColor(p.background)
+        paneBottomContainer.setBackgroundColor(p.background)
+        brandText.setTextColor(p.text)
+        divider.setColors(p.dividerLine, p.dividerPill)
+    }
+
+    /**
+     * ライト/ダークをアニメーションで切り替える（SPEC.md §10.16）。
+     * アプリ側クロームはクロスフェード、ブランドアイコンは 1 回転。
+     * WebView 内は uiMode の変化で prefers-color-scheme が切り替わる
+     * （各サイトの表示設定が「デバイスの設定に従う」のときに追従する）
+     */
+    private fun toggleTheme() {
+        darkMode = !darkMode
+        prefs.darkMode = darkMode
+        val from = if (darkMode) LIGHT_PALETTE else DARK_PALETTE
+        val to = if (darkMode) DARK_PALETTE else LIGHT_PALETTE
+
+        brandIcon.animate().rotationBy(360f).setDuration(450).start()
+        val evaluator = ArgbEvaluator()
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 350
+            addUpdateListener { anim ->
+                val f = anim.animatedFraction
+                applyThemeColors(
+                    Palette(
+                        background = evaluator.evaluate(f, from.background, to.background) as Int,
+                        dividerLine = evaluator.evaluate(f, from.dividerLine, to.dividerLine) as Int,
+                        dividerPill = evaluator.evaluate(f, from.dividerPill, to.dividerPill) as Int,
+                        text = evaluator.evaluate(f, from.text, to.text) as Int,
+                    ),
+                )
+            }
+            start()
+        }
+        AppCompatDelegate.setDefaultNightMode(
+            if (darkMode) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO,
+        )
     }
 
     /**
@@ -267,5 +328,27 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
         super.onPause()
         // ログイン状態の維持のため Cookie を書き出す（SPEC.md §6）
         CookieManager.getInstance().flush()
+    }
+
+    private data class Palette(
+        val background: Int,
+        val dividerLine: Int,
+        val dividerPill: Int,
+        val text: Int,
+    )
+
+    companion object {
+        private val DARK_PALETTE = Palette(
+            background = 0xFF000000.toInt(),
+            dividerLine = 0xFF3A3A3C.toInt(),
+            dividerPill = 0xFF8E8E93.toInt(),
+            text = 0xFF8E8E93.toInt(),
+        )
+        private val LIGHT_PALETTE = Palette(
+            background = 0xFFFFFFFF.toInt(),
+            dividerLine = 0xFFD8D8DC.toInt(),
+            dividerPill = 0xFF7A7A80.toInt(),
+            text = 0xFF6E6E73.toInt(),
+        )
     }
 }

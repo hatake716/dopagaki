@@ -48,6 +48,13 @@ class DividerView @JvmOverloads constructor(
     private val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = ContextCompat.getColor(context, R.color.divider_pill)
     }
+
+    /** テーマ切り替え用。ライト/ダークのクロスフェード中にも呼ばれる */
+    fun setColors(lineColor: Int, pillColor: Int) {
+        linePaint.color = lineColor
+        pillPaint.color = pillColor
+        invalidate()
+    }
     private val pillRect = RectF()
 
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop

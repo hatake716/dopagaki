@@ -19,6 +19,10 @@ class Prefs(context: Context) {
         get() = prefs.getString(KEY_X_URL, DEFAULT_X_URL) ?: DEFAULT_X_URL
         set(value) = prefs.edit().putString(KEY_X_URL, value).apply()
 
+    var darkMode: Boolean
+        get() = prefs.getBoolean(KEY_DARK_MODE, true)
+        set(value) = prefs.edit().putBoolean(KEY_DARK_MODE, value).apply()
+
     companion object {
         const val DEFAULT_RATIO = 1f / 3f
         const val MIN_RATIO = 0.15f
@@ -29,5 +33,6 @@ class Prefs(context: Context) {
         private const val KEY_RATIO = "top_ratio"
         private const val KEY_YOUTUBE_URL = "youtube_url"
         private const val KEY_X_URL = "x_url"
+        private const val KEY_DARK_MODE = "dark_mode"
     }
 }

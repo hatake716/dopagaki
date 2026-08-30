@@ -24,12 +24,14 @@
             android:background="@color/black">
 
             <ImageView
+                android:id="@+id/brandIcon"
                 android:layout_width="14dp"
                 android:layout_height="14dp"
                 android:src="@mipmap/ic_launcher"
                 android:importantForAccessibility="no" />
 
             <TextView
+                android:id="@+id/brandText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
