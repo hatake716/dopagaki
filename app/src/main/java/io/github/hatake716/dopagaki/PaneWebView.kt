@@ -115,12 +115,13 @@ class PaneWebView @JvmOverloads constructor(
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
-                // m.youtube.com は初回ロード後に document.open() で文書を書き換えることがあり、
-                // その時点で注入済みのリスナー・要素・style は全て消える（window のフラグだけ
-                // 残る）。document 同一性ガードで冪等にし、遅延再注入で書き換え後も復元する
+                // サイト側の文書書き換えで注入物が消える場合に備え、遅延しながら
+                // 複数回打ち直す（スクリプト側の style 生存ガードで冪等）
                 injectSiteUi(view)
                 view.postDelayed({ injectSiteUi(view) }, 1200)
                 view.postDelayed({ injectSiteUi(view) }, 3500)
+                view.postDelayed({ injectSiteUi(view) }, 8000)
+                view.postDelayed({ injectSiteUi(view) }, 20000)
             }
 
             override fun onRenderProcessGone(
@@ -195,10 +196,10 @@ class PaneWebView @JvmOverloads constructor(
          */
         private val YOUTUBE_UI_JS = """
             (function() {
-              // document.open() による書き換え後は document が別物になるので、
-              // window ではなく document の同一性で再実行を判定する
-              if (window.__dopagakiYtDoc === document) return;
-              window.__dopagakiYtDoc = document;
+              // 再実行判定は window フラグではなく「style 要素が DOM に生きているか」。
+              // サイト側の文書書き換えで注入物が消えた場合も、遅延再注入と SPA 遷移
+              // フックで復元される
+              if (document.getElementById('dopagaki-yt-style')) return;
               var css =
                 'ytm-pivot-bar-renderer{position:fixed !important;left:0 !important;right:auto !important;top:50% !important;bottom:auto !important;width:auto !important;height:auto !important;flex-direction:column !important;transform:translate(-110%,-50%) !important;transition:transform .25s ease !important;z-index:2147483000 !important;border-radius:0 14px 14px 0 !important;overflow:hidden !important;}' +
                 'html.dopagaki-menu ytm-pivot-bar-renderer{transform:translate(0,-50%) !important;}' +
@@ -208,11 +209,25 @@ class PaneWebView @JvmOverloads constructor(
                 '#dopagaki-ptr.spin svg{animation:dopagaki-rot .7s linear infinite;}' +
                 '@keyframes dopagaki-rot{to{transform:rotate(360deg)}}';
               var style = document.createElement('style');
+              style.id = 'dopagaki-yt-style';
               style.textContent = css;
               document.documentElement.appendChild(style);
+              // 注意: m.youtube.com は Trusted Types CSP を強制しており、innerHTML への
+              // 文字列代入は TypeError になる（実機で確認）。SVG は DOM API で組み立てる
               var ptr = document.createElement('div');
               ptr.id = 'dopagaki-ptr';
-              ptr.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#FF0033" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12,4 v13 M6,11 l6,6 6,-6"/></svg>';
+              var svgNS = 'http://www.w3.org/2000/svg';
+              var arrow = document.createElementNS(svgNS, 'svg');
+              arrow.setAttribute('viewBox', '0 0 24 24');
+              arrow.setAttribute('fill', 'none');
+              arrow.setAttribute('stroke', '#FF0033');
+              arrow.setAttribute('stroke-width', '2.5');
+              arrow.setAttribute('stroke-linecap', 'round');
+              arrow.setAttribute('stroke-linejoin', 'round');
+              var arrowPath = document.createElementNS(svgNS, 'path');
+              arrowPath.setAttribute('d', 'M12,4 v13 M6,11 l6,6 6,-6');
+              arrow.appendChild(arrowPath);
+              ptr.appendChild(arrow);
               document.documentElement.appendChild(ptr);
               var tryFs = function() {
                 if (document.fullscreenElement) return;
@@ -318,8 +333,8 @@ class PaneWebView @JvmOverloads constructor(
          */
         private val X_BARS_JS = """
             (function() {
-              if (window.__dopagakiXDoc === document) return;
-              window.__dopagakiXDoc = document;
+              // YouTube 側と同じ理由で style 要素の生存で再実行を判定する
+              if (document.getElementById('dopagaki-x-style')) return;
               var css =
                 'header[role="banner"],[data-testid="TopNavBar"]{position:fixed !important;top:0 !important;left:0 !important;right:0 !important;z-index:2147483000 !important;transform:translateY(-110%) !important;transition:transform .25s ease !important;}' +
                 'html.dopagaki-top header[role="banner"],html.dopagaki-top [data-testid="TopNavBar"]{transform:none !important;}' +
@@ -335,6 +350,7 @@ class PaneWebView @JvmOverloads constructor(
                 '[data-testid="pillLabel"]{display:none !important;}' +
                 'div[role="status"]:has([data-testid="pillLabel"]){display:none !important;}';
               var style = document.createElement('style');
+              style.id = 'dopagaki-x-style';
               style.textContent = css;
               document.documentElement.appendChild(style);
               var timers = {};

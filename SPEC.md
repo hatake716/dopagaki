@@ -153,8 +153,9 @@ dopagaki/
 
 ### 注入の再実行（重要・実機で確認）
 
-- **m.youtube.com は初回ロード後に `document.open()` で文書を書き換える**。このとき document に付けたリスナー・要素・style は全て消えるが、window のプロパティは残る。そのため注入ガードは window のフラグではなく **document の同一性**（`window.__dopagakiYtDoc === document`）で判定する
-- 注入は `onPageFinished` に加えて、その 1.2 秒後・3.5 秒後の遅延再注入と、SPA 遷移ごとの `doUpdateVisitedHistory` でも打ち直す（ガードにより冪等）
+- **m.youtube.com は Trusted Types CSP を強制**しており、`innerHTML` への文字列代入は TypeError になる。注入スクリプト内の DOM 構築は createElement / createElementNS で行う（これを踏むとスクリプトが途中で死に、以降のリスナー登録が全て失われる）
+- 注入ガードは window のフラグではなく **style 要素の DOM 生存**（`document.getElementById`）で判定する。サイト側の文書書き換えで注入物が消えても再注入で復元できる
+- 注入は `onPageFinished` に加えて、その 1.2/3.5/8/20 秒後の遅延再注入と、SPA 遷移ごとの `doUpdateVisitedHistory` でも打ち直す（ガードにより冪等）
 
 ### テーマ切り替え（ブランドバー）
 
