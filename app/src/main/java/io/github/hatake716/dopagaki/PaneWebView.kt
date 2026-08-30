@@ -227,9 +227,17 @@ class PaneWebView @JvmOverloads constructor(
                   el.id = 'dopagaki-invert';
                   el.textContent =
                     'html{filter:invert(1) hue-rotate(180deg);}' +
-                    'img,video,picture,canvas,iframe,embed,object,' +
-                    '[style*="background-image"],#dopagaki-ptr' +
-                    '{filter:invert(1) hue-rotate(180deg);}';
+                    ':is(img,video,picture,canvas,iframe,embed,object,' +
+                    '[style*="background-image"],#dopagaki-ptr)' +
+                    '{filter:invert(1) hue-rotate(180deg);}' +
+                    // X のアバターはインラインで filter:brightness(1) を持ち、上の打ち消しに
+                    // 勝ってしまう（実機で確認）。brightness を保ったまま !important で反転
+                    '[style*="background-image"][style*="brightness"]' +
+                    '{filter:invert(1) hue-rotate(180deg) brightness(1) !important;}' +
+                    // メディアの入れ子（bg-image div の中の img など）は二重打ち消しで
+                    // 再反転してしまうため、内側は素通しにする
+                    ':is(img,video,picture,canvas,iframe,embed,object,[style*="background-image"])' +
+                    ' :is(img,video,picture,canvas,embed,object){filter:none !important;}';
                   document.documentElement.appendChild(el);
                 } else if (!needInvert && el) {
                   el.remove();

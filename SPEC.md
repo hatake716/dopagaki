@@ -163,6 +163,7 @@ dopagaki/
 - アプリ側クローム（背景・ブランドバー・境界線）は `ValueAnimator` + `ArgbEvaluator` で 350ms クロスフェード、ブランドアイコンは 1 回転させる。配色は SharedPreferences に保存
 - WebView 内の prefers-color-scheme は uiMode の変化に追従する
 - **強制反転（フォールバック）**: 切り替えの 600ms 後、各ペインで body の背景輝度からサイトの描画テーマを推定し、希望と食い違っていれば `html{filter:invert(1) hue-rotate(180deg)}` を注入して強制的に反転する（画像・動画・iframe・自前 UI は同じフィルタを重ねて元の色に戻す）。ルート要素の filter はビューポート全体に適用される特例なので fixed 配置を壊さない。サイトが追従した場合は何もしない。ページ読み込み・SPA 遷移ごとにも再適用される
+- **画像の打ち消しの注意（実機で確認）**: X のアバターは `div` にインラインで `filter: brightness(1)` と `background-image` を併記しており、インライン style が打ち消しルールに勝って反転したままになる。`[style*="background-image"][style*="brightness"]` に `!important` で brightness 込みの打ち消しを当てる。また bg-image div の中の img などメディアの入れ子は二重打ち消しで再反転するため、内側は `filter: none !important` で素通しにする
 - `touchstart`/`touchmove`（capture, passive）で、ペイン上端 40px 内から 24px 以上下へのスワイプ → `<html>` に `dopagaki-top` クラス、下端 40px 内から上スワイプ → `dopagaki-bottom` クラスを 4 秒間付与して transform を解除する
 - X の SPA 遷移では document が生きているので style と リスナーは維持される。X 以外のサイトではセレクタが何にも一致せず無害
 
