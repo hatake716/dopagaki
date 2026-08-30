@@ -212,15 +212,15 @@ class PaneWebView @JvmOverloads constructor(
                   document.documentElement.classList.remove('dopagaki-menu');
                 }, 4000);
               };
-              var startY = null, edge = false;
+              var startX = null, edge = false;
               document.addEventListener('touchstart', function(ev) {
                 var t = ev.touches[0];
-                startY = t.clientY;
-                edge = t.clientY > window.innerHeight - 40;
+                startX = t.clientX;
+                edge = t.clientX < 40;
               }, { capture: true, passive: true });
               document.addEventListener('touchmove', function(ev) {
                 if (!edge) return;
-                if (ev.touches[0].clientY - startY < -24) { reveal(); edge = false; }
+                if (ev.touches[0].clientX - startX > 24) { reveal(); edge = false; }
               }, { capture: true, passive: true });
             })();
         """.trimIndent()
@@ -262,19 +262,20 @@ class PaneWebView @JvmOverloads constructor(
                   document.documentElement.classList.remove(cls);
                 }, 4000);
               };
-              var startY = null, edge = null;
+              var startX = null, startY = null, edge = null;
               document.addEventListener('touchstart', function(ev) {
                 var t = ev.touches[0];
+                startX = t.clientX;
                 startY = t.clientY;
                 edge = t.clientY < 40 ? 'top'
-                     : t.clientY > window.innerHeight - 40 ? 'bottom'
+                     : t.clientX < 40 ? 'left'
                      : null;
               }, { capture: true, passive: true });
               document.addEventListener('touchmove', function(ev) {
                 if (edge === null) return;
-                var dy = ev.touches[0].clientY - startY;
-                if (edge === 'top' && dy > 24) { reveal('dopagaki-top'); edge = null; }
-                else if (edge === 'bottom' && dy < -24) { reveal('dopagaki-menu'); edge = null; }
+                var t = ev.touches[0];
+                if (edge === 'top' && t.clientY - startY > 24) { reveal('dopagaki-top'); edge = null; }
+                else if (edge === 'left' && t.clientX - startX > 24) { reveal('dopagaki-menu'); edge = null; }
               }, { capture: true, passive: true });
             })();
         """.trimIndent()

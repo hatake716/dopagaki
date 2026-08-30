@@ -2,6 +2,7 @@ package io.github.hatake716.dopagaki
 
 import android.content.ActivityNotFoundException
 import android.content.pm.ApplicationInfo
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.view.MotionEvent
@@ -86,6 +87,7 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
         // レイアウトされるため、初回は divider 側のリスナーで height 確定後に同期される
         paneTopContainer.addOnLayoutChangeListener { _, _, _, _, bottom, _, _, _, oldBottom ->
             if (bottom != oldBottom) syncDividerPosition()
+            updateGestureExclusion()
         }
         divider.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
             if (bottom - top != oldBottom - oldTop) syncDividerPosition()
@@ -147,6 +149,28 @@ class MainActivity : AppCompatActivity(), PaneWebView.Listener, DividerView.List
 
     private fun syncDividerPosition() {
         divider.translationY = paneTopContainer.bottom - divider.height / 2f
+    }
+
+    /**
+     * 各ペイン左端の中央 100dp だけシステムのバックジェスチャーから除外し、
+     * 左端からの右スワイプ（＝縦メニュー表示）が WebView に届くようにする。
+     * 除外はエッジあたり合計 200dp までしか許可されないため中央の帯だけにする。
+     * それ以外の左端は従来どおりバックジェスチャーが効く
+     */
+    private fun updateGestureExclusion() {
+        val density = resources.displayMetrics.density
+        val stripWidth = (32 * density).toInt()
+        val halfBand = (50 * density).toInt()
+        val base = root.paddingTop
+        val topCenter = base + paneTopContainer.top + paneTopContainer.height / 2
+        val bottomCenter = base + paneBottomContainer.top + paneBottomContainer.height / 2
+        ViewCompat.setSystemGestureExclusionRects(
+            root,
+            listOf(
+                Rect(0, topCenter - halfBand, stripWidth, topCenter + halfBand),
+                Rect(0, bottomCenter - halfBand, stripWidth, bottomCenter + halfBand),
+            ),
+        )
     }
 
     /** ACTION_DOWN の位置で「最後に触ったペイン」を更新。境界線の帯の中は除外（SPEC.md §6） */
